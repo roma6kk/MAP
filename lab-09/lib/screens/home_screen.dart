@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 
 import '../models/app_user.dart';
-import '../services/hive_service.dart';
-import '../services/session.dart';
+import '../providers/favorites_provider.dart';
+import '../providers/session_provider.dart';
+import '../providers/shipments_provider.dart';
 import '../theme.dart';
 import '../widgets/shipment_card.dart';
 import 'favorites_screen.dart';
@@ -16,61 +17,62 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hive = HiveService.instance;
-    final session = Session.instance;
-    return ValueListenableBuilder<AppUser>(
-      valueListenable: session.current,
-      builder: (context, user, _) => Scaffold(
-        backgroundColor: Colors.white,
-        floatingActionButton: user.canEdit
-            ? FloatingActionButton(
-                backgroundColor: AppColors.orange,
-                foregroundColor: Colors.white,
-                onPressed: () => Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => const ShipmentFormScreen())),
-                child: const Icon(Icons.add_rounded),
-              )
-            : null,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _Header(user: user),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([hive.shipments.listenable(), hive.favorites.listenable()]),
-                  builder: (context, _) {
-                    final items = hive.shipments.values.toList();
-                    if (items.isEmpty) return const Center(child: Text('Нет посылок'));
-                    return ListView(
-                      padding: const EdgeInsets.only(bottom: 90),
-                      children: [
-                        for (final s in items)
-                          ShipmentCard(
-                            shipment: s,
-                            onTap: () => Navigator.push(context,
-                                MaterialPageRoute(builder: (_) => ShipmentDetailScreen(shipmentId: s.id))),
-                            onFavorite: () => session.toggleFavorite(s.id),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+    final canEdit = context.select<SessionProvider, bool>((s) => s.user.canEdit);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      floatingActionButton: canEdit
+          ? FloatingActionButton(
+              backgroundColor: AppColors.orange,
+              foregroundColor: Colors.white,
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const ShipmentFormScreen())),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+      body: const SafeArea(
+        child: Column(
+          children: [
+            _Header(),
+            SizedBox(height: 8),
+            Expanded(child: _ShipmentList()),
+          ],
         ),
       ),
     );
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.user});
-  final AppUser user;
+class _ShipmentList extends StatelessWidget {
+  const _ShipmentList();
 
   @override
   Widget build(BuildContext context) {
+    return Consumer<ShipmentsProvider>(
+      builder: (context, shipments, _) {
+        final items = shipments.items;
+        if (items.isEmpty) return const Center(child: Text('Нет посылок'));
+        return ListView(
+          padding: const EdgeInsets.only(bottom: 90),
+          children: [
+            for (final s in items)
+              ShipmentCard(
+                shipment: s,
+                onTap: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => ShipmentDetailScreen(shipmentId: s.id))),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.select<SessionProvider, AppUser>((s) => s.user);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 12, 0),
       child: Row(
@@ -92,12 +94,7 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Favorites',
-            icon: const Icon(Icons.favorite_border_rounded),
-            onPressed: () =>
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesScreen())),
-          ),
+          const FavoritesBadgeButton(),
           IconButton(
             tooltip: 'Security / storage',
             icon: const Icon(Icons.lock_outline_rounded),
@@ -110,26 +107,48 @@ class _Header extends StatelessWidget {
   }
 
   void _pickUser(BuildContext context, AppUser currentUser) {
+    final session = context.read<SessionProvider>();
     showModalBottomSheet(
       context: context,
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final u in HiveService.instance.users.values)
+            for (final u in session.users)
               ListTile(
                 leading: const Icon(Icons.person_outline_rounded),
                 title: Text(u.name),
                 subtitle: Text(u.role.name),
                 selected: u.id == currentUser.id,
                 onTap: () {
-                  Session.instance.current.value = u;
-                  Navigator.pop(context);
+                  session.switchUser(u);
+                  Navigator.pop(sheetContext);
                 },
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class FavoritesBadgeButton extends StatelessWidget {
+  const FavoritesBadgeButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = context.select<FavoritesProvider, int>((f) => f.count);
+    return IconButton(
+      tooltip: 'Favorites',
+      icon: Badge(
+        key: const Key('favorites-badge'),
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        backgroundColor: AppColors.orange,
+        child: const Icon(Icons.favorite_border_rounded),
+      ),
+      onPressed: () =>
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesScreen())),
     );
   }
 }

@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/shipment.dart';
-import '../services/session.dart';
+import '../providers/favorites_provider.dart';
 import '../theme.dart';
 
 class ShipmentCard extends StatelessWidget {
-  const ShipmentCard({super.key, required this.shipment, required this.onTap, this.onFavorite});
+  const ShipmentCard({super.key, required this.shipment, required this.onTap});
 
   final Shipment shipment;
   final VoidCallback onTap;
-  final VoidCallback? onFavorite;
 
   @override
   Widget build(BuildContext context) {
-    final fav = Session.instance.isFavorite(shipment.id);
+    final fav = context.select<FavoritesProvider, bool>((f) => f.isFavorite(shipment.id));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
       child: InkWell(
@@ -49,8 +49,9 @@ class ShipmentCard extends StatelessWidget {
               ),
               StatusPill(label: shipment.status),
               IconButton(
+                key: Key('fav-${shipment.id}'),
                 visualDensity: VisualDensity.compact,
-                onPressed: onFavorite,
+                onPressed: () => context.read<FavoritesProvider>().toggle(shipment.id),
                 icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                     color: fav ? AppColors.orange : AppColors.textGrey, size: 22),
               ),

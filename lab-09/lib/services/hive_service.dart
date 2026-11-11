@@ -14,6 +14,9 @@ class HiveService {
   HiveService._();
   static final instance = HiveService._();
 
+  @visibleForTesting
+  HiveService.withBoxes(this.users, this.shipments, this.favorites);
+
   static const _keyName = 'hive_encryption_key';
   static const _keyName2 = 'hive_encryption_key_wrong';
   static const usersBox = 'users';

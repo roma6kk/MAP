@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 
-import '../services/hive_service.dart';
-import '../services/session.dart';
+import '../providers/favorites_provider.dart';
+import '../providers/session_provider.dart';
+import '../providers/shipments_provider.dart';
 import '../widgets/shipment_card.dart';
 import 'shipment_detail_screen.dart';
 
@@ -11,22 +12,19 @@ class FavoritesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hive = HiveService.instance;
+    final userName = context.select<SessionProvider, String>((s) => s.user.name);
     return Scaffold(
-      appBar: AppBar(title: Text('Favorites — ${Session.instance.user.name}')),
-      body: ListenableBuilder(
-        listenable: Listenable.merge([hive.favorites.listenable(), hive.shipments.listenable()]),
-        builder: (context, _) {
+      appBar: AppBar(title: Text('Favorites — $userName')),
+      body: Consumer2<FavoritesProvider, ShipmentsProvider>(
+        builder: (context, favorites, shipments, _) {
           final items = [
-            for (final f in Session.instance.myFavorites())
-              ?hive.shipments.get(f.shipmentId),
+            for (final id in favorites.shipmentIds) ?shipments.byId(id),
           ];
           if (items.isEmpty) return const Center(child: Text('Избранное пусто'));
           return ListView(children: [
             for (final s in items)
               ShipmentCard(
                 shipment: s,
-                onFavorite: () => Session.instance.toggleFavorite(s.id),
                 onTap: () => Navigator.push(
                     context, MaterialPageRoute(builder: (_) => ShipmentDetailScreen(shipmentId: s.id))),
               ),

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/shipment.dart';
-import '../services/hive_service.dart';
-import '../services/session.dart';
+import '../providers/session_provider.dart';
+import '../providers/shipments_provider.dart';
 import '../theme.dart';
 
 class ShipmentFormScreen extends StatefulWidget {
@@ -13,6 +14,9 @@ class ShipmentFormScreen extends StatefulWidget {
   State<ShipmentFormScreen> createState() => _ShipmentFormScreenState();
 }
 
+// Локальное (эфемерное) состояние формы: контроллеры полей, ключ формы,
+// выбранные в выпадающих списках значения. Оно нужно только этому экрану
+// и живёт, пока открыт экран, поэтому остаётся в State, а не в Provider.
 class _ShipmentFormScreenState extends State<ShipmentFormScreen> {
   static const _images = [AppImages.macMini, AppImages.speaker, AppImages.drone, AppImages.box];
   static const _statuses = ['Pending', 'On Process', 'Transit', 'Delivered'];
@@ -31,8 +35,18 @@ class _ShipmentFormScreenState extends State<ShipmentFormScreen> {
   bool get _editing => widget.shipment != null;
 
   @override
+  void dispose() {
+    for (final c in [_id, _name, _from, _to, _sent, _est, _desc]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!Session.instance.user.canEdit) {
+    // Если пользователя сменили, пока форма открыта, экран сразу заблокируется.
+    final canEdit = context.select<SessionProvider, bool>((s) => s.user.canEdit);
+    if (!canEdit) {
       return const Scaffold(body: Center(child: Text('Недостаточно прав')));
     }
     return Scaffold(
@@ -48,7 +62,7 @@ class _ShipmentFormScreenState extends State<ShipmentFormScreen> {
               decoration: const InputDecoration(labelText: 'ID'),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Обязательное поле';
-                if (!_editing && HiveService.instance.shipments.containsKey(v.trim())) return 'ID уже существует';
+                if (!_editing && context.read<ShipmentsProvider>().contains(v.trim())) return 'ID уже существует';
                 return null;
               },
             ),
@@ -90,7 +104,7 @@ class _ShipmentFormScreenState extends State<ShipmentFormScreen> {
       );
 
   Future<void> _save() async {
-    if (!_form.currentState!.validate() || !Session.instance.user.canEdit) return;
+    if (!_form.currentState!.validate() || !context.read<SessionProvider>().user.canEdit) return;
     final s = Shipment(
       id: _id.text.trim(),
       image: _image,
@@ -102,7 +116,7 @@ class _ShipmentFormScreenState extends State<ShipmentFormScreen> {
       estimatedDate: _est.text.trim(),
       description: _desc.text.trim(),
     );
-    await HiveService.instance.shipments.put(s.id, s);
+    await context.read<ShipmentsProvider>().save(s);
     if (mounted) Navigator.pop(context);
   }
 }

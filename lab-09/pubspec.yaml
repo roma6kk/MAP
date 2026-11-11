@@ -1,4 +1,4 @@
-name: lab_08
+name: lab_09
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -38,6 +38,7 @@ dependencies:
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^11.2.0
   path_provider: ^2.1.6
+  provider: ^6.1.5+1
 
 dev_dependencies:
   flutter_test:

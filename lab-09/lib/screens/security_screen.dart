@@ -1,32 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../services/hive_service.dart';
+import '../providers/security_provider.dart';
 
-class SecurityScreen extends StatefulWidget {
+class SecurityScreen extends StatelessWidget {
   const SecurityScreen({super.key});
 
   @override
-  State<SecurityScreen> createState() => _SecurityScreenState();
-}
-
-class _SecurityScreenState extends State<SecurityScreen> {
-  String _log = '';
-  bool _busy = false;
-
-  Future<void> _run(Future<String> Function() f) async {
-    setState(() => _busy = true);
-    try {
-      final r = await f();
-      setState(() => _log = r);
-    } catch (e) {
-      setState(() => _log = 'Ошибка: $e');
-    } finally {
-      setState(() => _busy = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final security = context.watch<SecurityProvider>();
+    final busy = security.busy;
     return Scaffold(
       appBar: AppBar(title: const Text('Security / storage')),
       body: Padding(
@@ -38,14 +21,15 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 '(flutter_secure_storage).'),
             const SizedBox(height: 16),
             FilledButton(
-                onPressed: _busy ? null : () => _run(HiveService.instance.demoWrongKey),
+                onPressed: busy ? null : () => context.read<SecurityProvider>().demoWrongKey(),
                 child: const Text('Прочитать с неправильным ключом')),
             const SizedBox(height: 8),
             FilledButton(
-                onPressed: _busy ? null : () => _run(HiveService.instance.compactAll),
+                onPressed: busy ? null : () => context.read<SecurityProvider>().compactAll(),
                 child: const Text('Сжать боксы (compact)')),
             const SizedBox(height: 16),
-            Expanded(child: SingleChildScrollView(child: SelectableText(_log))),
+            if (busy) const LinearProgressIndicator(),
+            Expanded(child: SingleChildScrollView(child: SelectableText(security.log))),
           ],
         ),
       ),
